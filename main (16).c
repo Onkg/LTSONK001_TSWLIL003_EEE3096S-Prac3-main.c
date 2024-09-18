@@ -487,6 +487,15 @@ void TIM16_IRQHandler(void)
 	HAL_TIM_IRQHandler(&htim16);
 
 	// TODO: Initialise a string to output second line on LCD
+	static int bin_index = 0;
+	uint8_t EEPROM_val = read_from_address(ADDRESS+bin_index%6);
+	char str[16];
+	if (EEPROM_val == bin_array[bin_index%6]){
+	 sprintf(str,"%d",EEPROM_val);
+	}
+	else{
+		sprintf(str,"%s","SPI ERROR!");
+	}
 
 
 	// TODO: Change LED pattern; output 0x01 if the read SPI data is incorrect
