@@ -449,7 +449,23 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void EXTI0_1_IRQHandler(void)
 {
+	HAL_GPIO_EXTI_IRQHandler(Button0_Pin); // Clear interrupt flags
 	// TODO: Add code to switch LED7 delay frequency
+	static int prev_tick = 0;
+	if (HAL_GetTick() - prev_tick < 200) return;
+
+	switch (f_current){
+	case 2:
+		f_current = 1;
+		__HAL_TIM_SET_AUTORELOAD(&htim6,1000-1);
+		break;
+	default:
+		f_current = 2;
+		__HAL_TIM_SET_AUTORELOAD(&htim6,500-1);
+	}
+	prev_tick = HAL_GetTick();
+
+}
 	
   
 
