@@ -530,7 +530,8 @@ uint32_t pollADC(void){
 // Calculate PWM CCR value
 uint32_t ADCtoCCR(uint32_t adc_val){
   // TODO: Calculate CCR value (val) using an appropriate equation
-
+    uint32_t val = adc_val * (uint32_t) 47999/4095;
+	return val;
 	//return val;
 }
 
