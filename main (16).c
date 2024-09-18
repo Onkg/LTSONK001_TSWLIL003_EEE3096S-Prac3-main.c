@@ -59,7 +59,8 @@ TIM_HandleTypeDef htim16;
 /* USER CODE BEGIN PV */
 
 // TODO: Define input variables
-
+int f_current = 2;
+uint8_t bin_array[] = {0b10101010, 0b01010101, 0b11001100, 0b00110011, 0b11110000, 0b00001111};
 
 /* USER CODE END PV */
 
