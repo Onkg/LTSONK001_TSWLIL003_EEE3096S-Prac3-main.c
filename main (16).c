@@ -23,7 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "stm32f0xx.h"
-#include <lcd_stm32f0.c>
+//#include <lcd_stm32f0.c>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,6 +42,7 @@
 #define WRSR 0b00000001 // write status register
 #define READ 0b00000011
 #define WRITE 0b00000010
+#define ADDRESS 0x0000    // EEPROM Address
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -51,7 +52,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc;
-
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim16;
@@ -59,9 +59,8 @@ TIM_HandleTypeDef htim16;
 /* USER CODE BEGIN PV */
 
 // TODO: Define input variables
-int f_current = 2;
-uint8_t bin_array[] = {0b10101010, 0b01010101, 0b11001100, 0b00110011, 0b11110000, 0b00001111};
-
+uint8_t binary_values[] = {0b10101010, 0b01010101, 0b11001100, 0b00110011, 0b11110000, 0b00001111};
+int delay_freq= 2;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -117,12 +116,12 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  init_spi();
   MX_GPIO_Init();
   MX_ADC_Init();
   MX_TIM3_Init();
   MX_TIM16_Init();
   MX_TIM6_Init();
+  init_spi();
   /* USER CODE BEGIN 2 */
 
   // Initialise LCD
@@ -138,9 +137,9 @@ int main(void)
 
   // TODO: Write all bytes to EEPROM using "write_to_address"
   for (int i = 0; i <6;i++){
-	  write_to_address(ADDRESS+i,bin_array[i]);
+	  write_to_address(ADDRESS+i,binary_values[i]);
   }
-  
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -149,12 +148,10 @@ int main(void)
   {
 
 	// TODO: Poll ADC
-	uint32_t adc_val=pollADC();
-        	  
-
+	  uint32_t adc_val = pollADC();
 
 	// TODO: Get CRR
-        CCR=ADCtoCCR(adc_val);
+	  CCR = ADCtoCCR(adc_val);
 
   // Update PWM value
 	__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_3, CCR);
@@ -414,6 +411,9 @@ static void MX_GPIO_Init(void)
   LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB);
 
   /**/
+  LL_GPIO_ResetOutputPin(SPI_Out_GPIO_Port, SPI_Out_Pin);
+
+  /**/
   LL_GPIO_ResetOutputPin(LED7_GPIO_Port, LED7_Pin);
 
   /**/
@@ -433,6 +433,14 @@ static void MX_GPIO_Init(void)
   LL_EXTI_Init(&EXTI_InitStruct);
 
   /**/
+  GPIO_InitStruct.Pin = SPI_Out_Pin;
+  GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
+  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+  GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
+  LL_GPIO_Init(SPI_Out_GPIO_Port, &GPIO_InitStruct);
+
+  /**/
   GPIO_InitStruct.Pin = LED7_Pin;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
   GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
@@ -450,26 +458,22 @@ static void MX_GPIO_Init(void)
 void EXTI0_1_IRQHandler(void)
 {
 	HAL_GPIO_EXTI_IRQHandler(Button0_Pin); // Clear interrupt flags
+
 	// TODO: Add code to switch LED7 delay frequency
 	static int prev_tick = 0;
 	if (HAL_GetTick() - prev_tick < 200) return;
 
 	switch (f_current){
 	case 2:
-		f_current = 1;
+		delay_freq= 1;
 		__HAL_TIM_SET_AUTORELOAD(&htim6,1000-1);
 		break;
 	default:
-		f_current = 2;
+		delay_freq= 2;
 		__HAL_TIM_SET_AUTORELOAD(&htim6,500-1);
 	}
 	prev_tick = HAL_GetTick();
 
-}
-	
-  
-
-	HAL_GPIO_EXTI_IRQHandler(Button0_Pin); // Clear interrupt flags
 }
 
 void TIM6_IRQHandler(void)
@@ -487,22 +491,18 @@ void TIM16_IRQHandler(void)
 	HAL_TIM_IRQHandler(&htim16);
 
 	// TODO: Initialise a string to output second line on LCD
-	static int bin_index = 0;
-	uint8_t EEPROM_val = read_from_address(ADDRESS+bin_index%6);
+	static int binary_index = 0;
+	uint8_t EEPROM_val = read_from_address(ADDRESS+binary_index%6);
 	char str[16];
-	if (EEPROM_val == bin_array[bin_index%6]){
+	if (EEPROM_val == binary_values[binary_index%6]){
 	 sprintf(str,"%d",EEPROM_val);
 	}
 	else{
 		sprintf(str,"%s","SPI ERROR!");
 	}
-
-
 	// TODO: Change LED pattern; output 0x01 if the read SPI data is incorrect
 	writeLCD(str);
-	bin_index++;
-  
-
+	binary_index++;
 }
 
 // TODO: Complete the writeLCD function
@@ -514,8 +514,6 @@ void writeLCD(char *char_in){
   lcd_putstring("EEPROM byte:");
   lcd_command(LINE_TWO);
   lcd_putstring(char_in);
-	
-  
 }
 
 // Get ADC value
@@ -530,9 +528,8 @@ uint32_t pollADC(void){
 // Calculate PWM CCR value
 uint32_t ADCtoCCR(uint32_t adc_val){
   // TODO: Calculate CCR value (val) using an appropriate equation
-    uint32_t val = adc_val * (uint32_t) 47999/4095;
+	uint32_t val = adc_val * (uint32_t) 47999/4095;
 	return val;
-	//return val;
 }
 
 void ADC1_COMP_IRQHandler(void)
@@ -600,7 +597,7 @@ static void write_to_address(uint16_t address, uint8_t data) {
 	*((uint8_t*)(&SPI2->DR)) = (address >> 8); 	// Address MSB
 	while ((SPI2->SR & SPI_SR_RXNE) == 0); 		// Hang while RX is empty
 	dummy = SPI2->DR;
-	*((uint8_t*)(&SPI2->DR)) = (address); 		// Address LSB
+	*((uint8_t*)(&SPI2->DR)) = (address);		// Address LSB
 	while ((SPI2->SR & SPI_SR_RXNE) == 0); 		// Hang while RX is empty
 	dummy = SPI2->DR;
 
@@ -674,3 +671,4 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
