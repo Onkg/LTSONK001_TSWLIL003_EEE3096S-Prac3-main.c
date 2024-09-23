@@ -463,7 +463,7 @@ void EXTI0_1_IRQHandler(void)
 	static int prev_tick = 0;
 	if (HAL_GetTick() - prev_tick < 200) return;
 
-	switch (f_current){
+	switch (delay_freq){
 	case 2:
 		delay_freq= 1;
 		__HAL_TIM_SET_AUTORELOAD(&htim6,1000-1);
